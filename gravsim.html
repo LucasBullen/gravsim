@@ -1,0 +1,212 @@
+<html><head><style type="text/css"></style></head><body style="margin:0px 0px 0px 0px; padding:0px 0px 0px 0px">
+<canvas id="thegame" width="1208" height="150" style="position:absolute"></canvas>
+<input id="deltaC" type="text" placeholder="deltaC, default:100,000" style="position:absolute; left:10px; top:120px;">
+<input id="deltaT" type="text" placeholder="deltaT, default:1" style="position:absolute; left:10px; top:150px;">
+1</input>
+
+<script>
+
+var c = document.getElementById("thegame");
+var ctx = c.getContext("2d");
+
+var trail = document.createElement('canvas');
+var trailctx = trail.getContext("2d");
+trail.width = 2000;
+trail.height = 2000;
+
+var WIDTH = window.innerWidth;
+var HEIGHT = window.innerHeight;
+
+window.addEventListener('keydown', onKeyDown, false);
+window.addEventListener('keyup', onKeyUp, false);
+var keysDown = new Array();
+
+var au = 149597871000;
+var G = 6.673*Math.pow(10, -11);
+var deltaT = 0;
+var deltaC = 100000;
+var pi = 3.14159;
+var viewy = 40*au;
+var totalTime = 0;
+
+var landerX = 0;
+var landerY = au;
+var landerVX = -27000;
+var landerVY = -30000;
+var jupiterAngle = 2.15*pi/4;
+var jupiterX = Math.cos(jupiterAngle)*au*5.2;
+var jupiterY = Math.sin(jupiterAngle)*au*5.2;
+var jupiterVX = Math.sin(jupiterAngle)*30000*0.434;
+var jupiterVY = -Math.cos(jupiterAngle)*30000*0.434;
+
+var center = {
+   x: WIDTH/2,
+   y: HEIGHT/2
+};
+
+function onKeyDown(event) {
+   keysDown[event.keyCode] = 1;
+}
+
+function onKeyUp(event) {
+   keysDown[event.keyCode] = 0;
+}
+
+// Pixels to meters
+function ptom() {
+   return HEIGHT/viewy;
+}
+
+objects = new Array();
+
+var CelestialBody = function(position, velocity, mass, draw) {
+   this.draw = draw;
+   this.vel = velocity;
+   this.mass = mass;
+   this.x = position.x;
+   this.y = position.y;
+
+   objects.push(this);
+}
+
+function update() {
+   for (var i = 0; i < objects.length; i++) {
+      for (var j = 0; j < objects.length; j++) {
+         if (i != j) {
+            var radius = Math.sqrt(Math.pow(objects[i].x-objects[j].x, 2)+Math.pow(objects[i].y-objects[j].y, 2));
+            var acc = G*objects[j].mass/Math.pow(radius, 2);
+            objects[i].vel.x = objects[i].vel.x+acc*deltaT*(objects[j].x-objects[i].x)/radius;
+            objects[i].vel.y = objects[i].vel.y+acc*deltaT*(objects[j].y-objects[i].y)/radius;
+         }
+      }
+   }
+   for (var k = 0; k < objects.length; k++) {
+      objects[k].x=objects[k].x+objects[k].vel.x*deltaT;
+      objects[k].y=objects[k].y+objects[k].vel.y*deltaT;
+   }
+}
+
+var willEscape = function(object) {
+   var e = (Math.pow(object.vel.x,2)+Math.pow(object.vel.y,2))/2;
+   for (var k = 0; k < objects.length; k++) {
+      if (objects[k] != object) {
+         e -= G*objects[k].mass/Math.pow(Math.pow(object.x-objects[k].x,2)+Math.pow(object.y-objects[k].y, 2),1/2);
+      }
+   }
+
+   return (e > 0)
+}
+
+/*
+function [willEsc] = willEscape(celObs)
+   lander= celObs(1);%or wherever lander is in the array
+   G=6.67*10^(-11);% Universal gravitational energy
+   E=((lander.velx)^2+(lander.vely)^2)/2;%Kinetic Energy
+
+   for i 0:size(celObs)
+      if i~=1
+         E-=G*celObs(i).mass/((lander.posx-celObs(i).posx)^2+(lander.posy-celObs(i).posy)^2)^(1/2);%Subtract the potential energy from each other body (0 at infinity)
+      end
+   end
+
+   if (E>0)
+      willEsc= true;
+   end
+   else
+      willEsc= false;
+   end
+end
+
+*/
+
+var theSun = new CelestialBody({x:0, y:0}, {x:0, y:0}, 1.989*Math.pow(10,30), function() {
+   ctx.fillStyle = 'yellow';
+   ctx.fillRect(this.x*ptom() - 5 + center.x, -1*this.y*ptom() - 5 + center.y, 10, 10);
+
+   trailctx.fillStyle = 'yellow';
+   trailctx.fillRect(this.x*ptom() + center.x, -1*this.y*ptom() + center.y, 2, 2);
+
+   ctx.textAlign="center"; 
+   ctx.font = "14px Arial";
+   ctx.fillStyle = "#fff";
+   ctx.fillText("Sun", this.x*ptom() + center.x, -1*this.y*ptom() + center.y + 20);
+});
+
+var theEarth = new CelestialBody({x:landerX, y:landerY}, {x:landerVX, y:landerVY}, 203000, function() {
+   ctx.fillStyle = 'blue';
+   ctx.fillRect(this.x*ptom() - 5 + center.x, -1*this.y*ptom() - 5 + center.y, 10, 10);
+
+   trailctx.fillStyle = 'blue';
+   trailctx.fillRect(this.x*ptom() + center.x, -1*this.y*ptom() + center.y, 2, 2);
+
+   ctx.textAlign="center"; 
+   ctx.font = "14px Arial";
+   ctx.fillStyle = "#fff";
+   ctx.fillText("Earth", this.x*ptom() + center.x, -1*this.y*ptom() + center.y + 20);
+});
+
+var jupiter = new CelestialBody({x:jupiterX, y:jupiterY}, {x:jupiterVX, y:jupiterVY}, 1.898*Math.pow(10,27), function() {
+   ctx.fillStyle = 'red';
+   ctx.fillRect(this.x*ptom() - 5 + center.x, -1*this.y*ptom() - 5 + center.y, 10, 10);
+
+   trailctx.fillStyle = 'red';
+   trailctx.fillRect(this.x*ptom() + center.x, -1*this.y*ptom() + center.y, 2, 2);
+
+   ctx.textAlign="center"; 
+   ctx.font = "14px Arial";
+   ctx.fillStyle = "#fff";
+   ctx.fillText("Jupiter", this.x*ptom() + center.x, -1*this.y*ptom() + center.y + 20);
+});
+
+var lastTime = new Date();
+window.setInterval(function() {
+   WIDTH = window.innerWidth;
+   HEIGHT = window.innerHeight;
+   c.width = WIDTH; // Set width and clear screen
+   c.height = HEIGHT; // Set height and clear sceen
+
+   ctx.fillStyle = "#000";
+   ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+   if (parseInt(document.getElementById("deltaC").value) > 0) {
+      deltaC = parseInt(document.getElementById("deltaC").value);
+   } else {
+      deltaC = 100000;
+   }
+
+   if (parseInt(document.getElementById("deltaT").value) > 0) {
+      deltaT = parseInt(document.getElementById("deltaT").value);
+   } else {
+      deltaT = 1;
+   }
+
+   ctx.drawImage(trail, 0, 0);
+
+   totalTime += deltaT*deltaC;
+   var tempTime = new Date();
+   var frameTime = (tempTime.getTime() - lastTime.getTime())/1000;
+   lastTime = tempTime;
+
+   center = {
+      x: WIDTH/2,
+      y: HEIGHT/2
+   };
+
+   ctx.fillStyle = "#fff";
+   ctx.fillText("Years: " + ( Math.round((totalTime/(60*60*24*365))*100)/100 ), 20, 20);
+   ctx.fillText("FPS: " + Math.round(1/frameTime), 20, 40);
+   ctx.fillText(deltaT*deltaC + " times normal speed", 20, 60);
+   ctx.fillText("Pixels per Au: " + (Math.round(ptom()*au*10)/10), 20, 80);
+   ctx.fillText("Earth will escape: " + willEscape(theEarth), 20, 100)
+
+   for (var i = 0; i < deltaC; i++) {
+      update();
+   }
+   for (var k = 0; k < objects.length; k++) {
+      objects[k].draw();
+   }
+
+}, 1);
+
+</script>
+</body></html>
